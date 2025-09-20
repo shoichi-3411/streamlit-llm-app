@@ -1,30 +1,25 @@
 import streamlit as st
 import openai
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-# OpenAI APIキーの設定
-def set_openai_key():
-    """OpenAI APIキーを設定する"""
+# OpenAI クライアントの初期化
+def get_openai_client():
+    """OpenAI クライアントを初期化する"""
     try:
         # Streamlit Cloud用のsecrets
         if "OPENAI_API_KEY" in st.secrets:
-            openai.api_key = st.secrets["OPENAI_API_KEY"]
-            return True
+            return openai.OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     except:
         pass
     
     # 環境変数から取得
     api_key = os.getenv("OPENAI_API_KEY")
     if api_key:
-        openai.api_key = api_key
-        return True
+        return openai.OpenAI(api_key=api_key)
     
-    return False
+    return None
 
-def get_llm_response(user_input: str, expert_type: str) -> str:
+def get_llm_response(user_input: str, expert_type: str, client) -> str:
     """
     入力テキストと専門家タイプを受け取り、OpenAI APIからの回答を返す関数
     """
@@ -63,8 +58,8 @@ def get_llm_response(user_input: str, expert_type: str) -> str:
     }
     
     try:
-        # OpenAI APIを呼び出し
-        response = openai.ChatCompletion.create(
+        # OpenAI APIを呼び出し（新しい方法）
+        response = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": system_messages[expert_type]},
@@ -87,8 +82,9 @@ def main():
         layout="wide"
     )
     
-    # OpenAI APIキーの設定チェック
-    if not set_openai_key():
+    # OpenAI クライアントの初期化
+    client = get_openai_client()
+    if not client:
         st.error("⚠️ OpenAI APIキーが設定されていません。下記の方法で設定してください。")
         with st.expander("🔑 APIキー設定方法"):
             st.markdown("""
@@ -156,7 +152,7 @@ def main():
         if st.button("🚀 回答を取得", type="primary", use_container_width=True):
             if user_input.strip():
                 with st.spinner(f"{expert_type}として回答を生成中..."): 
-                    response = get_llm_response(user_input, expert_type)
+                    response = get_llm_response(user_input, expert_type, client)
                     
                     st.markdown("### 🤖 AI専門家からの回答")
                     st.markdown(f"**{expert_type}からのアドバイス:**")
